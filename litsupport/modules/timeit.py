@@ -77,10 +77,13 @@ def _mutateScript(context, script):
 
 def _collectTime(context, timefiles, metric_name="exec_time"):
     time = 0.0
+    stddev = 0.0
     for timefile in timefiles:
         filecontent = context.read_result_file(context, timefile)
-        time += getUserTimeFromContents(filecontent)
-    return {metric_name: time}
+        (delta_time, delta_stddev) = getUserTimeFromContents(filecontent)
+        time += delta_time
+        stddev += delta_stddev
+    return {metric_name: time, f'{metric_name}-%stddev': stddev/len(timefiles)}
 
 
 def mutatePlan(context, plan):
@@ -105,6 +108,9 @@ def getUserTimeFromContents(contents):
     lines = [from_bytes(l) for l in contents.splitlines()]
     line = [line for line in lines if line.startswith("user")]
     assert len(line) == 1
-
-    m = re.match(r"user\s+([0-9.]+)", line[0])
-    return float(m.group(1))
+    m_time = re.match(r"user\s+([0-9.]+)", line[0])
+    
+    line = [line for line in lines if line.startswith("%stddev")]
+    assert len(line) == 1
+    m_stddev = re.match(r"%stddev\s+([0-9.]+)(?=%)", line[0])
+    return (float(m_time.group(1)), float(m_stddev.group(1)))

@@ -31,9 +31,11 @@ done
 
 if [ "$OUTPUT" = "$ERRPUT" ]; then
   # Use >& to ensure the streams are properly interleaved.
-  perf stat -o $PERFSTAT $@ < $INPUT >& $OUTPUT
+  perf stat -e user_time -o $PERFSTAT $@ < $INPUT >& $OUTPUT
+  perf stat -e user_time --repeat=3 -o $PERFSTAT "$@" < "$INPUT" >/dev/null 2>&1
 else
-  perf stat -o $PERFSTAT $@ < $INPUT > $OUTPUT 2> $ERRPUT
+  perf stat -e user_time -o $PERFSTAT $@ < $INPUT > $OUTPUT 2> $ERRPUT
+  perf stat -e user_time --repeat=3 -o $PERFSTAT $@ < $INPUT 2>/dev/null 2>&1
 fi
 
 EXITCODE=$?
@@ -46,6 +48,6 @@ if [ "$APPEND_STATUS" = "1" ]; then
 fi
 
 echo exit $EXITCODE > $REPORT
-awk -F' ' '{if ($2 ~ /^task-clock/ || $3 ~ /^task-clock/) {gsub(/,/,"",$1);print "user",$1/1000;} else if ($2 == "seconds" && $4 == "elapsed") {print "real",$1;} else if ($2 ~ /^instructions/) {gsub(/,/,"",$1);print "instructions",$1}}' $PERFSTAT >> $REPORT
+awk -F' ' '{if ($2 == "ns") {gsub(/,/,"",$1);print "user",$1/1000000000;print "%stddev", $(NF-1)}}' $PERFSTAT >> $REPORT
 
 exit $EXITCODE
